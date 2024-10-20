@@ -1,12 +1,11 @@
 import numpy as np
-
+import cv2
 class Descriptor:
 
     def __init__(self, name=None):
         self.name = name
 
     def extract_descriptors(self, img, bin_number):
-        print('Extracting descriptors for image')
         if self.name == 'joint_color_hist':
             return self.joint_color_histogram(img, bin_number)
         elif self.name == 'color_hist':
@@ -15,6 +14,14 @@ class Descriptor:
             return self.extract_color_descriptor(img)
         elif self.name == 'random':
             return self.extractRandom(img)
+        elif self.name == 'sift':
+            return self.sift_descriptor(img)
+        elif self.name == 'color_grid_descriptor':
+            return self.color_grid_descriptor(img, bin_number)
+        elif self.name == 'edge_descriptor':
+            return self.edge_descriptor(img)
+        elif self.name == 'edge_grid_descriptor':
+            return self.edge_grid_descriptor(img, bin_number)
         else:
             return self.extractRandom(img)
     def extractRandom(self, img):
@@ -31,7 +38,7 @@ class Descriptor:
         B = np.mean(img[:, :, 0])
         return np.array([R, G, B])
 
-    def extract_color_hist_descriptor(self, img, bin_number):
+    def extract_color_hist_descriptor(self, img, bin_number=16):
         red_hist, bins_red = np.histogram(img[:,:,2], bins=bin_number, range=(0,255))
         green_hist, bins_green = np.histogram(img[:,:,1], bins=bin_number, range=(0,255))
         blue_hist, bins_blue = np.histogram(img[:,:,0], bins=bin_number, range=(0,255))
@@ -71,3 +78,58 @@ class Descriptor:
         
         return hist
 
+    def sift_descriptor(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        sift = cv2.SIFT_create()
+        kp, des = sift.detectAndCompute(img, None)
+        return des
+
+    def color_grid_descriptor(self, img, grid_size=16):
+        height, width, _ = img.shape
+        grid_h, grid_w = height // grid_size, width // grid_size
+
+
+        histograms = []
+        for row in range(grid_size):
+            for col in range(grid_size):
+                grid_img = img[row * grid_h: (row + 1) * grid_h, col * grid_w: (col + 1) * grid_w]
+                F = self.extract_color_hist_descriptor(grid_img, 16)
+                histograms.append(F)
+        
+        return np.concatenate(histograms)
+    
+    def edge_descriptor(self, img, block_size=2, ksize=3, k=0.04):
+        
+        img = np.float32(img)
+
+        # Harris corner detection
+        dst = cv2.cornerHarris(img, block_size, ksize, k)
+
+        # Dilate corner points for marking them
+        dst = cv2.dilate(dst, None)
+
+        # Threshold for an optimal value, it may vary depending on the image.
+        img[dst > 0.01 * dst.max()] = [0, 0, 255]
+
+        # Count the number of corners detected (you can also return other statistics)
+        avg_response = np.mean(dst[dst > 0.01 * dst.max()])  # Average response of strong corners
+
+
+        # You can return the number of corners or corner locations as part of the descriptor
+        return avg_response
+
+    def edge_grid_descriptor(self, img, grid_size=16):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        height, width = img.shape
+        grid_h, grid_w = height // grid_size, width // grid_size
+
+
+        histograms = []
+        for row in range(grid_size):
+            for col in range(grid_size):
+                grid_img = img[row * grid_h: (row + 1) * grid_h, col * grid_w: (col + 1) * grid_w]
+                F = self.edge_descriptor(grid_img)
+                histograms.append(F)
+        
+        return np.concatenate(histograms)
+    

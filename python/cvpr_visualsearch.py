@@ -4,7 +4,7 @@ import cv2
 import random
 from cvpr_compare import CompareDistance
 import glob
-from cvpr_compare import CompareDistance
+
 DESCRIPTOR_FOLDER = 'descriptors'
 DESCRIPTOR_SUBFOLDER = 'globalRGBhisto'
 IMAGE_FOLDER = 'MSRC_ObjCategImageDatabase_v2'
@@ -33,20 +33,36 @@ class VisualSearch:
             F = np.load(feature_path)
             self.descriptors_dict[name] = F
         return self.descriptors_dict
-    def visual_search(self, query_image_path=None, num_results=15, distance_metric='euclidean'):
+    def visual_search(self, query_image_path=None, num_results=15, 
+                      distance_metric='euclidean', pca=False):
         print(f"Performing visual search using {self.descriptor_name} descriptors")
         if query_image_path == None:
             query_image_path = random.choice(glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True))
         query_image = cv2.imread(query_image_path)
         query_basename = os.path.basename(query_image_path).split('.')[0]
+        if pca:
+            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict)
         query_feature = self.descriptors_dict[query_basename]
         image_paths = glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True)
         similarity_list = []
-        for image_path in image_paths:
-            image_basename = os.path.basename(image_path).split('.')[0]
-            image_feature = self.descriptors_dict[image_basename]
-            dist = self.distance_calculator.calculate_distance(query_feature, image_feature)
-            similarity_list.append({'image_name': image_basename, 'dist': dist})
+        if distance_metric == 'mahalanobis_distance':
+            # Calculate mean and inverse covariance matrix once for all descriptors
+            mean, cov_matrix, inv_cov_matrix = self.distance_calculator.calculate_eigenmodel(list(self.descriptors_dict.values()))
+            
+            for image_path in image_paths:
+                image_basename = os.path.basename(image_path).split('.')[0]
+                image_feature = self.descriptors_dict[image_basename]
+                dist = self.distance_calculator.mahalanobis_distance(query_feature, image_feature, inv_cov_matrix)
+                if np.isnan(dist):
+                    continue
+                similarity_list.append({'image_name': image_basename, 'dist': dist})
+        
+        else:
+            for image_path in image_paths:
+                image_basename = os.path.basename(image_path).split('.')[0]
+                image_feature = self.descriptors_dict[image_basename]
+                dist = self.distance_calculator.calculate_distance(query_feature, image_feature)
+                similarity_list.append({'image_name': image_basename, 'dist': dist})
         sorted_list = sorted(similarity_list, key=lambda dist: dist['dist'])
         return query_basename, sorted_list
     
@@ -56,7 +72,7 @@ class VisualSearch:
         FP = 0
         FN = 0
         print('QUERY ' + query_label)
-        for image in retreived_images[:15]:
+        for image in retreived_images[:top_n]:
             image_label = image['image_name'].split('_')[0]
             if image_label == query_label:
                 TP += 1

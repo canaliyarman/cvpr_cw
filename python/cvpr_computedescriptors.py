@@ -3,13 +3,13 @@ import numpy as np
 import cv2
 from descriptors import Descriptor
 import glob
-
+from tqdm import tqdm
 class cvpr_compute_descriptors:
     def __init__(self, DATASET_FOLDER, OUT_FOLDER):
         self.DATASET_FOLDER = DATASET_FOLDER
         self.OUT_FOLDER = OUT_FOLDER
 
-    def compute_descriptors(self, descriptor_name):
+    def compute_descriptors(self, descriptor_name, bins=8):
         # Ensure the output directory exists
         
         os.makedirs(os.path.join(self.OUT_FOLDER, descriptor_name), exist_ok=True)
@@ -18,14 +18,13 @@ class cvpr_compute_descriptors:
 
         # Iterate through all BMP files in the dataset folder
         descriptor = Descriptor(descriptor_name)
+        print(f'Computing {descriptor_name} descriptors...')
         for image_path in image_paths:
-            print(f"Processing file {image_path}")
             image = cv2.imread(image_path)
-            feature = descriptor.extract_descriptors(image, 8)
+            feature = descriptor.extract_descriptors(image, bins).flatten()
             file_name = os.path.basename(image_path).split('.')[0]
 
             save_path = descriptors_path + file_name + '.npy' # extract filename add .npy extension
-            print(save_path)
             np.save(save_path, feature)
 
 
