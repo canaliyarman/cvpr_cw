@@ -84,6 +84,7 @@ class Descriptor:
         kp, des = sift.detectAndCompute(img, None)
         return des
 
+
     def color_grid_descriptor(self, img, grid_size=16):
         height, width, _ = img.shape
         grid_h, grid_w = height // grid_size, width // grid_size

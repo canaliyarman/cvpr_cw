@@ -65,6 +65,44 @@ class VisualSearch:
                 similarity_list.append({'image_name': image_basename, 'dist': dist})
         sorted_list = sorted(similarity_list, key=lambda dist: dist['dist'])
         return query_basename, sorted_list
+    def visual_search_custom_descriptors(self, query_image_path=None, 
+                      distance_metric='euclidean', pca=False, descriptors_dicts=[]):
+        
+        print(f"Performing visual search using multiple descriptors")
+        combined_descriptors = {}
+        if len(descriptors_dicts) > 1:
+            for key in descriptors_dicts[0].keys():
+                combined_descriptors[key] = np.concatenate([descriptor[key] for descriptor in descriptors_dicts])
+            self.descriptors_dict = combined_descriptors
+        if query_image_path == None:
+            query_image_path = random.choice(glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True))
+        query_image = cv2.imread(query_image_path)
+        query_basename = os.path.basename(query_image_path).split('.')[0]
+        if pca:
+            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict)
+        query_feature = self.descriptors_dict[query_basename]
+        image_paths = glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True)
+        similarity_list = []
+        if distance_metric == 'mahalanobis_distance':
+            # Calculate mean and inverse covariance matrix once for all descriptors
+            mean, cov_matrix, inv_cov_matrix = self.distance_calculator.calculate_eigenmodel(list(self.descriptors_dict.values()))
+            
+            for image_path in image_paths:
+                image_basename = os.path.basename(image_path).split('.')[0]
+                image_feature = self.descriptors_dict[image_basename]
+                dist = self.distance_calculator.mahalanobis_distance(query_feature, image_feature, inv_cov_matrix)
+                if np.isnan(dist):
+                    continue
+                similarity_list.append({'image_name': image_basename, 'dist': dist})
+        
+        else:
+            for image_path in image_paths:
+                image_basename = os.path.basename(image_path).split('.')[0]
+                image_feature = self.descriptors_dict[image_basename]
+                dist = self.distance_calculator.calculate_distance(query_feature, image_feature)
+                similarity_list.append({'image_name': image_basename, 'dist': dist})
+        sorted_list = sorted(similarity_list, key=lambda dist: dist['dist'])
+        return query_basename, sorted_list
     
     def calculate_precision_recall(self, query, retreived_images, top_n=15):
         query_label = query.split('_')[0]
