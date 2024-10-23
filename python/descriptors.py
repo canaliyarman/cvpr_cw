@@ -16,6 +16,8 @@ class Descriptor:
             return self.extractRandom(img)
         elif self.name == 'sift':
             return self.sift_descriptor(img)
+        elif self.name == 'sift_keypoints':
+            return self.sift_descriptor_keypoints(img)
         elif self.name == 'color_grid_descriptor':
             return self.color_grid_descriptor(img, bin_number)
         elif self.name == 'edge_descriptor':
@@ -83,8 +85,31 @@ class Descriptor:
         sift = cv2.SIFT_create()
         kp, des = sift.detectAndCompute(img, None)
         return des
-
-
+    
+    def sift_descriptor_keypoints(self, img, bin_number=16, window_size=16):
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        sift = cv2.SIFT_create()
+        key_points, des = sift.detectAndCompute(img_gray, None)
+        combined_des = []
+        for i in range(len(key_points)):
+            key_point = key_points[i]
+            patch = self.extract_patch_around_keypoint(img, key_point)
+            color_hist = self.extract_color_hist_descriptor(patch, bin_number).flatten()
+            combined_des.append(np.concatenate((des[i], color_hist)))
+        return np.array(combined_des)
+    
+    def extract_patch_around_keypoint(self, img, key_point):
+        x, y = int(key_point.pt[0]), int(key_point.pt[1])
+        size = int(key_point.size)
+        
+        x_start = max(0, x - size // 2)
+        y_start = max(0, y - size // 2)
+        x_end = min(img.shape[1], x + size // 2)
+        y_end = min(img.shape[0], y + size // 2)
+        
+        patch = img[y_start:y_end, x_start:x_end]
+        return patch
+    
     def color_grid_descriptor(self, img, grid_size=16):
         height, width, _ = img.shape
         grid_h, grid_w = height // grid_size, width // grid_size
@@ -98,7 +123,7 @@ class Descriptor:
                 histograms.append(F)
         
         return np.concatenate(histograms)
-    
+
     def edge_descriptor(self, img, block_size=2, ksize=3, k=0.04):
         
         img = np.float32(img)
