@@ -109,7 +109,6 @@ class VisualSearch:
         TP = 0
         FP = 0
         FN = 0
-        print('QUERY ' + query_label)
         for image in retreived_images[:top_n]:
             image_label = image['image_name'].split('_')[0]
             if image_label == query_label:
@@ -120,13 +119,29 @@ class VisualSearch:
             image_label = image['image_name'].split('_')[0]
             if image_label == query_label:
                 FN += 1
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
+        precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+        recall = TP / (TP + FN) if (TP + FN) > 0 else 0
         return precision, recall
     
-        
+    def calculate_average_precision(self, query_basename, retrieved_images_sorted):
+        # Calculate AP as described in the slide
+        relevant_images = [image for image in retrieved_images_sorted if image['image_name'].split('_')[0] == query_basename.split('_')[0]]
+        num_relevant = len(relevant_images)
 
+        if num_relevant == 0:
+            return 0
 
+        precision_sum = 0
+        relevant_count = 0
+
+        for n, image in enumerate(retrieved_images_sorted, 1):
+            image_label = image['image_name'].split('_')[0]
+            if image_label == query_basename.split('_')[0]:
+                relevant_count += 1
+                precision_at_n = relevant_count / n
+                precision_sum += precision_at_n
+
+        return precision_sum / num_relevant
 # sorted_list = sorted(similarity_list, key=lambda dist: dist['dist'])
 
 # DATASET_FOLDER = './MSRC_ObjCategImageDatabase_v2/Images/'  # Modify this path as needed

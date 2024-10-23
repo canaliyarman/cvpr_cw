@@ -22,7 +22,7 @@ class cvpr_compute_descriptors:
         print(f'Computing {descriptor_name} descriptors...')
         for image_path in image_paths:
             image = cv2.imread(image_path)
-            if descriptor_name == 'sift':
+            if descriptor_name == 'sift' or descriptor_name == 'sift_keypoints':
                 feature = descriptor.extract_descriptors(image, bins)
             else:
                 feature = descriptor.extract_descriptors(image, bins).flatten()
@@ -45,8 +45,8 @@ class cvpr_compute_descriptors:
         visual_vocabulary = kmeans.cluster_centers_
         return visual_vocabulary, kmeans
     
-    def compute_bovw(self, descriptors_folder, kmeans, dictionary_size=128):
-        os.makedirs(os.path.join(self.OUT_FOLDER, 'sift_bovw'), exist_ok=True)
+    def compute_bovw(self, descriptors_folder, kmeans, dictionary_size=128, name='sift_bovw'):
+        os.makedirs(os.path.join(self.OUT_FOLDER, name), exist_ok=True)
         descriptor_paths = glob.glob(descriptors_folder + "*.npy", recursive=True)
         print(f'Computing BoVW histograms...')
         for descriptor_path in tqdm(descriptor_paths):
@@ -54,9 +54,8 @@ class cvpr_compute_descriptors:
             descriptor = np.load(descriptor_path)
             visual_words = kmeans.predict(descriptor)
             histogram, _ = np.histogram(visual_words, bins=np.arange(dictionary_size+1), density=True)
-            np.save(self.OUT_FOLDER + 'sift_bovw/' + descriptor_basename + '.npy', histogram)
-
-
+            np.save(self.OUT_FOLDER + f'{name}/' + descriptor_basename + '.npy', histogram)
+        
 # compute = cvpr_computedescriptors('MSRC_ObjCategImageDatabase_v2/Images/', 'python/descriptors/')
 # compute.compute_descriptors('color_hist')
 # DATASET_FOLDER = 'MSRC_ObjCategImageDatabase_v2'
