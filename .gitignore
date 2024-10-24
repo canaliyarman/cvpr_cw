@@ -163,3 +163,4 @@ cython_debug/
 *.bmp
 *.npy
 python/descriptors/
+.DS_Store
