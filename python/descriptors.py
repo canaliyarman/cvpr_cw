@@ -5,27 +5,20 @@ class Descriptor:
     def __init__(self, name=None):
         self.name = name
 
-    def extract_descriptors(self, img, bin_number):
-        if self.name == 'joint_color_hist':
-            return self.joint_color_histogram(img, bin_number)
-        elif self.name == 'color_hist':
-            return self.extract_color_hist_descriptor(img, bin_number)
-        elif self.name == 'color':
-            return self.extract_color_descriptor(img)
-        elif self.name == 'random':
-            return self.extractRandom(img)
-        elif self.name == 'sift':
-            return self.sift_descriptor(img)
-        elif self.name == 'sift_keypoints':
-            return self.sift_descriptor_keypoints(img)
-        elif self.name == 'color_grid_descriptor':
-            return self.color_grid_descriptor(img, bin_number)
-        elif self.name == 'edge_descriptor':
-            return self.edge_descriptor(img)
-        elif self.name == 'edge_grid_descriptor':
-            return self.edge_grid_descriptor(img, bin_number)
-        else:
-            return self.extractRandom(img)
+    def extract_descriptors(self, img, bin_number,grid_size=16):
+        descriptor_methods = {
+            'joint_color_hist': lambda: self.joint_color_histogram(img, bin_number),
+            'color_hist': lambda: self.extract_color_hist_descriptor(img, bin_number),
+            'color': lambda: self.extract_color_descriptor(img),
+            'random': lambda: self.extractRandom(img),
+            'sift': lambda: self.sift_descriptor(img),
+            'sift_keypoints': lambda: self.sift_descriptor_keypoints(img),
+            'color_grid_descriptor': lambda: self.color_grid_descriptor(img, bin_number=bin_number, grid_size=grid_size),
+            'edge_descriptor': lambda: self.edge_descriptor(img),
+            'edge_grid_descriptor': lambda: self.edge_grid_descriptor(img, bin_number=bin_number, grid_size=grid_size)
+        }
+        
+        return descriptor_methods.get(self.name, lambda: self.extractRandom(img))()
     def extractRandom(self, img):
         # Generate a random row vector with 30 elements
         F = np.random.rand(1, 30)
@@ -44,6 +37,10 @@ class Descriptor:
         red_hist, bins_red = np.histogram(img[:,:,2], bins=bin_number, range=(0,255))
         green_hist, bins_green = np.histogram(img[:,:,1], bins=bin_number, range=(0,255))
         blue_hist, bins_blue = np.histogram(img[:,:,0], bins=bin_number, range=(0,255))
+
+        red_hist = red_hist / np.sum(red_hist) if np.sum(red_hist) > 0 else red_hist
+        green_hist = green_hist / np.sum(green_hist) if np.sum(green_hist) > 0 else green_hist
+        blue_hist = blue_hist / np.sum(blue_hist) if np.sum(blue_hist) > 0 else blue_hist
         # plt.figure(figsize=(10, 5))
 
         # plt.subplot(3, 1, 1)
@@ -110,7 +107,7 @@ class Descriptor:
         patch = img[y_start:y_end, x_start:x_end]
         return patch
     
-    def color_grid_descriptor(self, img, grid_size=16):
+    def color_grid_descriptor(self, img, grid_size=16, bin_number=16):
         height, width, _ = img.shape
         grid_h, grid_w = height // grid_size, width // grid_size
 
@@ -119,7 +116,7 @@ class Descriptor:
         for row in range(grid_size):
             for col in range(grid_size):
                 grid_img = img[row * grid_h: (row + 1) * grid_h, col * grid_w: (col + 1) * grid_w]
-                F = self.extract_color_hist_descriptor(grid_img, 16)
+                F = self.extract_color_hist_descriptor(grid_img, bin_number=bin_number)
                 histograms.append(F)
         
         return np.concatenate(histograms)
@@ -144,7 +141,30 @@ class Descriptor:
         # You can return the number of corners or corner locations as part of the descriptor
         return avg_response
 
-    def edge_grid_descriptor(self, img, grid_size=16):
+    def sobel_extractor(self, img, kernel_size=5, bin_number=16):
+
+        sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=kernel_size)  # Gradient in x direction
+        sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=kernel_size)  # Gradient in y direction
+        magnitude = np.sqrt(sobelx**2 + sobely**2)
+        orientation = np.arctan2(sobely, sobelx)  # Radians
+        orientation = np.degrees(orientation)  # Convert radians to degrees
+        
+        # Normalize the orientation to be between 0 and 360 degrees
+        orientation = np.mod(orientation, 360)
+
+        # Bin the orientations into `bin_size` bins (e.g., 16 bins)
+        bin_edges = np.linspace(0, 360, bin_number + 1)
+        orientation_binned = np.digitize(orientation, bin_edges) - 1  # Get the bin index for each pixel
+        
+        # Create a histogram of the binned orientations, weighted by the gradient magnitude
+        histogram, _ = np.histogram(orientation_binned, bins=np.arange(bin_number + 1), weights=magnitude)
+        
+        # Normalize the histogram so that it sums to 1
+        if np.sum(histogram) > 0:
+            histogram = histogram / np.sum(histogram)
+
+        return histogram
+    def edge_grid_descriptor(self, img, grid_size=16, bin_number=16):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         height, width = img.shape
         grid_h, grid_w = height // grid_size, width // grid_size
@@ -154,7 +174,8 @@ class Descriptor:
         for row in range(grid_size):
             for col in range(grid_size):
                 grid_img = img[row * grid_h: (row + 1) * grid_h, col * grid_w: (col + 1) * grid_w]
-                F = self.edge_descriptor(grid_img)
+                F = self.sobel_extractor(grid_img, kernel_size=5, bin_number=bin_number)
+                # F = self.edge_descriptor(grid_img)
                 histograms.append(F)
         
         return np.concatenate(histograms)

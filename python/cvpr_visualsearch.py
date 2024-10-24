@@ -94,7 +94,6 @@ class VisualSearch:
                 if np.isnan(dist):
                     continue
                 similarity_list.append({'image_name': image_basename, 'dist': dist})
-        
         else:
             for image_path in image_paths:
                 image_basename = os.path.basename(image_path).split('.')[0]

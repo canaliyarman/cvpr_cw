@@ -10,7 +10,7 @@ class cvpr_compute_descriptors:
         self.DATASET_FOLDER = DATASET_FOLDER
         self.OUT_FOLDER = OUT_FOLDER
 
-    def compute_descriptors(self, descriptor_name, bins=8):
+    def compute_descriptors(self, descriptor_name, bins=8, grid_size=16):
         # Ensure the output directory exists
         
         os.makedirs(os.path.join(self.OUT_FOLDER, descriptor_name), exist_ok=True)
@@ -25,7 +25,7 @@ class cvpr_compute_descriptors:
             if descriptor_name == 'sift' or descriptor_name == 'sift_keypoints':
                 feature = descriptor.extract_descriptors(image, bins)
             else:
-                feature = descriptor.extract_descriptors(image, bins).flatten()
+                feature = descriptor.extract_descriptors(image, bins, grid_size=grid_size).flatten()
             file_name = os.path.basename(image_path).split('.')[0]
 
             save_path = descriptors_path + file_name + '.npy' # extract filename add .npy extension
