@@ -1,10 +1,25 @@
 import numpy as np
 import cv2
+import torch
+import torchvision.models as models
+import torch.nn as nn
+from torchvision import transforms
+from PIL import Image
 class Descriptor:
 
     def __init__(self, name=None):
         self.name = name
-
+        self.model = models.resnet34(pretrained=True)
+        self.preprocess = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        # Remove the final fully connected layer to get features instead of class scores
+        # This can be done by taking only up to the average pooling layer
+        self.model = nn.Sequential(*list(self.model.children())[:-1])
+        self.model.eval()  # Set to evaluation mode
     def extract_descriptors(self, img, bin_number,grid_size=16):
         descriptor_methods = {
             'joint_color_hist': lambda: self.joint_color_histogram(img, bin_number),
@@ -15,7 +30,8 @@ class Descriptor:
             'sift_keypoints': lambda: self.sift_descriptor_keypoints(img),
             'color_grid_descriptor': lambda: self.color_grid_descriptor(img, bin_number=bin_number, grid_size=grid_size),
             'edge_descriptor': lambda: self.edge_descriptor(img),
-            'edge_grid_descriptor': lambda: self.edge_grid_descriptor(img, bin_number=bin_number, grid_size=grid_size)
+            'edge_grid_descriptor': lambda: self.edge_grid_descriptor(img, bin_number=bin_number, grid_size=grid_size),
+            'resnet': lambda: self.extract_resnet_descriptor(img),
         }
         
         return descriptor_methods.get(self.name, lambda: self.extractRandom(img))()
@@ -32,7 +48,36 @@ class Descriptor:
         G = np.mean(img[:, :, 1])
         B = np.mean(img[:, :, 0])
         return np.array([R, G, B])
+    def extract_resnet_descriptor(self, img):
 
+        # model = models.resnet34(pretrained=True)
+
+        # # Remove the final fully connected layer to get features instead of class scores
+        # # This can be done by taking only up to the average pooling layer
+        # model = nn.Sequential(*list(model.children())[:-1])
+        # model.eval()  # Set to evaluation mode
+
+        # preprocess = transforms.Compose([
+        #     transforms.Resize(256),
+        #     transforms.CenterCrop(224),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        # ])
+        img = Image.fromarray(img) 
+        input_tensor = self.preprocess(img)
+        input_batch = input_tensor.unsqueeze(0)  # Add a batch dimension
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self.model.to(device)
+        input_batch = input_batch.to(device)
+
+        # Extract features
+        with torch.no_grad():  # No need for gradients, as we're only extracting features
+            features = self.model(input_batch)
+
+        # Flatten the features to get a 1D vector
+        features = features.view(features.size(0), -1)  # Convert to (batch_size, feature_dim)
+        features_np = features.cpu().numpy().flatten()  # Flatten to a 1D array if needed
+        return features_np
     def extract_color_hist_descriptor(self, img, bin_number=16):
         red_hist, bins_red = np.histogram(img[:,:,2], bins=bin_number, range=(0,255))
         green_hist, bins_green = np.histogram(img[:,:,1], bins=bin_number, range=(0,255))
@@ -93,7 +138,7 @@ class Descriptor:
             patch = self.extract_patch_around_keypoint(img, key_point)
             color_hist = self.extract_color_hist_descriptor(patch, bin_number).flatten()
             combined_des.append(np.concatenate((des[i], color_hist)))
-        return np.array(combined_des)
+        return np.array(combined_des).flatten()
     
     def extract_patch_around_keypoint(self, img, key_point):
         x, y = int(key_point.pt[0]), int(key_point.pt[1])
@@ -164,6 +209,7 @@ class Descriptor:
             histogram = histogram / np.sum(histogram)
 
         return histogram
+    
     def edge_grid_descriptor(self, img, grid_size=16, bin_number=16):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         height, width = img.shape

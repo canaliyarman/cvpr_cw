@@ -22,7 +22,10 @@ class cvpr_compute_descriptors:
         print(f'Computing {descriptor_name} descriptors...')
         for image_path in image_paths:
             image = cv2.imread(image_path)
+            cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             if descriptor_name == 'sift' or descriptor_name == 'sift_keypoints':
+                feature = descriptor.extract_descriptors(image, bins)
+            elif descriptor_name == 'resnet':
                 feature = descriptor.extract_descriptors(image, bins)
             else:
                 feature = descriptor.extract_descriptors(image, bins, grid_size=grid_size).flatten()
