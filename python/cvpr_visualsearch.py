@@ -34,14 +34,14 @@ class VisualSearch:
             self.descriptors_dict[name] = F
         return self.descriptors_dict
     def visual_search(self, query_image_path=None, num_results=15, 
-                      distance_metric='euclidean', pca=False):
+                      distance_metric='euclidean', pca=False, pca_order=0.95):
         print(f"Performing visual search using {self.descriptor_name} descriptors")
         if query_image_path == None:
             query_image_path = random.choice(glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True))
         query_image = cv2.imread(query_image_path)
         query_basename = os.path.basename(query_image_path).split('.')[0]
         if pca:
-            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict)
+            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict, n_components=pca_order)
         query_feature = self.descriptors_dict[query_basename]
         image_paths = glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True)
         similarity_list = []
@@ -66,7 +66,7 @@ class VisualSearch:
         sorted_list = sorted(similarity_list, key=lambda dist: dist['dist'])
         return query_basename, sorted_list
     def visual_search_custom_descriptors(self, query_image_path=None, 
-                      distance_metric='euclidean', pca=False, descriptors_dicts=[]):
+                      distance_metric='euclidean', pca=False, descriptors_dicts=[], pca_order=0.95):
         
         print(f"Performing visual search using multiple descriptors")
         combined_descriptors = {}
@@ -79,7 +79,7 @@ class VisualSearch:
         query_image = cv2.imread(query_image_path)
         query_basename = os.path.basename(query_image_path).split('.')[0]
         if pca:
-            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict)
+            self.descriptors_dict = self.distance_calculator.apply_pca(self.descriptors_dict, n_components=pca_order)
         query_feature = self.descriptors_dict[query_basename]
         image_paths = glob.glob(self.IMAGE_FOLDER + "*.bmp", recursive=True)
         similarity_list = []

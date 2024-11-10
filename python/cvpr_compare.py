@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 from sklearn.decomposition import PCA
 from scipy.spatial import distance
+from sklearn.preprocessing import StandardScaler
+
 
 class CompareDistance:
     def __init__(self):
@@ -20,11 +22,13 @@ class CompareDistance:
         bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
         matches = bf.match(F1, F2)
 
-    def apply_pca(self, descriptors, n_components='mle'):
+    def apply_pca(self, descriptors, n_components=0.95):
         
         descriptors_list = list(descriptors.values())
+        scaler = StandardScaler()
+        descriptors_normalized = scaler.fit_transform(descriptors_list)
         pca = PCA()
-        reduced_descriptors = pca.fit_transform(descriptors_list)
+        reduced_descriptors = pca.fit_transform(descriptors_normalized, n_components)
         descriptors = dict(zip(descriptors.keys(), reduced_descriptors))
         return descriptors
     # def mahalanobis_distance(self, query_descriptor, mean, inv_cov_matrix):
